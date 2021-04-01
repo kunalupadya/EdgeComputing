@@ -1,0 +1,31 @@
+Student profiles
+Attributes
+- which grade
+- living on campus or off-campus but nearby
+- where they're living
+- % of meals from campus eateries
+- num of in-person classes (0-4)
+- hours of sleep
+- class attendance %
+- social score
+- studious score
+- athletic score
+
+dependent attributes
+which grade -> living on campus
+living on campus -> where they're living
+living on campus, where they're living -> % of meals from campus eateries
+
+
+
+Generate user schedules from those profiles
+    generate classes, then sleep
+Maybe start with a daily task list and then fit things into the schedules
+
+
+Generate timestamped locations from those schedules - shouldn’t be too hard
+Locations are quantized and will just come from a predefined list of on-campus
+
+Will not consider breaks.
+Will consider weekends.
+Each week will differ in activities outside of class.
