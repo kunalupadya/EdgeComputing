@@ -64,8 +64,10 @@ def norm_pdf(x, mu=0, sigma=1):
 class Student():
     """docstring for Student"""
 
-    def __init__(self, id=0):
+    def __init__(self, id, start_date, end_date):
         self.id = id
+        self.start_date = datetime.datetime(start_date.year, start_date.month, start_date.day)
+        self.end_date = datetime.datetime(end_date.year, end_date.month, end_date.day)
         self.randomize_attributes()
         self.randomize_schedule()
 
@@ -161,9 +163,9 @@ class Student():
         # major?
 
     def randomize_schedule(self):
-        # start date: Monday, Jan 25, 2021
-        self.start_date = datetime.datetime(2021, 1, 25)
-        # end date: Friday, Apr 23, 2021
+        # Define first and last Mondays based on start and end dates
+        self.first_monday = self.start_date - datetime.timedelta(days=self.start_date.weekday())
+        self.last_monday = self.end_date - datetime.timedelta(days=self.end_date.weekday())
 
         self.schedule = []
 
@@ -173,6 +175,15 @@ class Student():
         self.sort_schedule()
 
         self.generate_meals()
+
+    def add_event(self, event):
+        """Assuming schedule is sorted chronologically by start time,
+        adds event to preserve order"""
+        for i, e in enumerate(self.schedule):
+            if event.start < e.start:
+                self.schedule.insert(i, event)
+                return
+        self.schedule.append(event)
 
     def sort_schedule(self):
         self.schedule.sort(key=lambda event: event.start)
@@ -210,7 +221,8 @@ class Student():
         earliest_class_start = 8  # 0800
         latest_class_start = 17  # 1700
 
-        # actually create classes
+        # create weekly class template
+        classes = []
         i = 0
         while i < num_classes:
             online = np.random.random() < fraction_online
@@ -235,12 +247,13 @@ class Student():
                 lecture1_start = None
                 lecture_start_hour = np.random.randint(earliest_class_start, latest_class_start)
                 lecture_start_minute = 15 * np.random.randint(3)
+                lecture_start_td = datetime.timedelta(hours=lecture_start_hour, minutes=lecture_start_minute)
                 if lecture_days == 'M-W':
-                    lecture1_start = datetime.datetime(2021, 1, 25, lecture_start_hour, lecture_start_minute)
+                    lecture1_start = self.first_monday + lecture_start_td
                 elif lecture_days == 'T-Th':
-                    lecture1_start = datetime.datetime(2021, 1, 26, lecture_start_hour, lecture_start_minute)
+                    lecture1_start = self.first_monday + lecture_start_td + datetime.timedelta(days=1)
                 elif lecture_days == 'W-F':
-                    lecture1_start = datetime.datetime(2021, 1, 27, lecture_start_hour, lecture_start_minute)
+                    lecture1_start = self.first_monday + lecture_start_td + datetime.timedelta(days=2)
 
                 lecture2_start = lecture1_start + datetime.timedelta(days=2)
 
@@ -255,7 +268,7 @@ class Student():
                 while not lab or not asynchronous and (lab.conflicts_with(lecture1) or lab.conflicts_with(lecture2)):
                     start_hour = np.random.randint(earliest_class_start, latest_class_start)
                     start_minute = 15 * np.random.randint(3)
-                    start = datetime.datetime(2021, 1, 25, start_hour, start_minute)
+                    start = self.first_monday + datetime.timedelta(hours=start_hour, minutes=start_minute)
                     start += datetime.timedelta(days=np.random.randint(4))
                     end = start + datetime.timedelta(hours=lab_length)
                     lab = Event(f"lab{i}", start, end, location_id)
@@ -268,13 +281,13 @@ class Student():
                         or has_lab and discussion.conflicts_with(lab):
                     start_hour = np.random.randint(earliest_class_start, latest_class_start)
                     start_minute = 15 * np.random.randint(3)
-                    start = datetime.datetime(2021, 1, 25, start_hour, start_minute)
+                    start = self.first_monday + datetime.timedelta(hours=start_hour, minutes=start_minute)
                     start += datetime.timedelta(days=np.random.randint(4))
                     end = start + datetime.timedelta(hours=discussion_length)
                     discussion = Event(f"discussion{i}", start, end, location_id)
 
             conflict = False
-            for e in self.schedule:
+            for e in classes:
                 if not asynchronous and (e.conflicts_with(lecture1) or e.conflicts_with(lecture2)) \
                         or has_lab and e.conflicts_with(lab) \
                         or has_discussion and e.conflicts_with(discussion):
@@ -283,26 +296,38 @@ class Student():
 
             if not conflict:
                 if not asynchronous:
-                    self.schedule.append(lecture1)
-                    self.schedule.append(lecture2)
+                    classes.append(lecture1)
+                    classes.append(lecture2)
                 if has_lab:
-                    self.schedule.append(lab)
+                    classes.append(lab)
                 if has_discussion:
-                    self.schedule.append(discussion)
+                    classes.append(discussion)
                 i += 1
+
+        # add classes to schedule over entire range, factoring in attendance percentage
+        dt = self.start_date
+        while dt <= self.end_date:
+            for c in classes:
+                if dt.weekday() == c.start.weekday():
+                    if np.random.random() <= self.class_attendance:
+                        self.add_event(c)
+
+            dt += datetime.timedelta(days=1)
 
     def generate_sleep(self):
         earliest_sleep_start = 21  # 2100
         latest_sleep_start = 23  # 2300
 
-        for i in range(25, 30):
+        dt = self.start_date
+        while dt <= self.end_date:
             sleep_start_hour = np.random.randint(earliest_sleep_start, latest_sleep_start)
             sleep_start_minute = 15 * np.random.randint(3)
-            sleep_start = datetime.datetime(2021, 1, i, sleep_start_hour, sleep_start_minute)
+            sleep_start = dt + datetime.timedelta(hours=sleep_start_hour, minutes=sleep_start_minute)
             sleep_end = sleep_start + datetime.timedelta(hours=self.hours_of_sleep)
             location_id = locations[self.residence]
-            sleep = Event(f"sleep{i}", sleep_start, sleep_end, location_id)
-            self.schedule.append(sleep)
+            sleep = Event(f"sleep{dt.month * dt.day}", sleep_start, sleep_end, location_id)
+            self.add_event(sleep)
+            dt += datetime.timedelta(days=1)
 
     def generate_meals(self):
         """
@@ -318,9 +343,10 @@ class Student():
 
         meal_mid_goals = [("breakfast", 8), ("lunch", 12), ("dinner", 19)]
 
-        for i in range(25, 30):
+        dt = self.start_date
+        while dt <= self.end_date:
             for name, j in meal_mid_goals:
-                goal_mid = datetime.datetime(2021, 1, i, j)
+                goal_mid = dt + datetime.timedelta(hours=j)
                 window = self.find_window(goal_mid)
                 if not window:  # no time, skip meal
                     continue
@@ -346,7 +372,10 @@ class Student():
                     mend = goal_mid + half_longest_meal_td
                     meal = Event(name, mstart, mend, m_location_id)
 
-                self.schedule.insert(second, meal)
+                # self.schedule.insert(second, meal)
+                self.add_event(meal)
+
+            dt += datetime.timedelta(days=1)
 
     def find_window(self, dt):
         """Tries to find largest window of unscheduled time including datetime dt
@@ -415,8 +444,10 @@ def main():
     # Create students
     students = []
     num_students = 20
+    start_date = datetime.datetime(2021, 1, 25)  # fyi 1/25/21 is the first Monday of Spring 2021 semester
+    end_date = datetime.datetime(2021, 4, 23)  # fyi 4/23/21 is the last Friday of Spring 2021 semester
     for i in range(num_students):
-        students.append(Student(id=i))
+        students.append(Student(i, start_date, end_date))
 
     # Create student sessions with a sliding window
     # session = (loc, tim, tar)
@@ -431,8 +462,9 @@ def main():
         student_sessions[s.id] = sessions
 
     # print stuff
-    print(students[0].get_locations_each_hour())
-    print(student_sessions)
+    # print(students[0])
+    # print(students[0].get_locations_each_hour())
+    # print(student_sessions)
 
     # pickle stuff
     with open("old_data.pickle", "wb") as f:
