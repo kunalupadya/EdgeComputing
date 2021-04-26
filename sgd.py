@@ -35,9 +35,9 @@ with open(r"old_data.pickle", "rb") as input_file:
 global_model = Model(hidden_dims,num_locs,num_layers)
 
 # get data & indx here
-local_models = []
-for u in range(num_users):
-    local_models.append(LocalModel(None, None, B, 3, lr))
+# local_models = []
+# for u in range(num_users):
+#     local_models.append(LocalModel(None, None, B, 3, lr))
 
 
 # class DatasetSplit(Dataset):

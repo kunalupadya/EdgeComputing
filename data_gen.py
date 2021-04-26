@@ -3,6 +3,7 @@ import numpy as np
 import datetime
 import bidict
 import pickle
+import torch
 
 # locations_list = [
 locations_dict = {
@@ -426,7 +427,7 @@ def main():
         location_ids, hours = s.get_locations_each_hour()
         sessions = []
         for i in range(len(location_ids) - sess_len):
-            sessions.append((location_ids[i:i+sess_len], hours[i:i+sess_len], location_ids[i+1:i+sess_len+1]))
+            sessions.append((torch.from_numpy(np.array(location_ids[i:i+sess_len])), torch.from_numpy(np.array(hours[i:i+sess_len])), torch.from_numpy(np.array(location_ids[i+sess_len])))) #i+1:i+sess_len+1
         student_sessions[s.id] = sessions
 
     # print stuff
@@ -434,7 +435,7 @@ def main():
     print(student_sessions)
 
     # pickle stuff
-    with open("data.pickle", "wb") as f:
+    with open("old_data.pickle", "wb") as f:
         pickle.dump(student_sessions, f)
 
     # n = np.sort(np.random.normal(size=1000))
